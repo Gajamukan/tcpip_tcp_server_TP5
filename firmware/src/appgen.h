@@ -58,12 +58,8 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 #include <stdlib.h>
 #include "system_config.h"
 #include "system_definitions.h"
-
 #include "DefMenuGen.h" 
-#include "GesPec12.h"
-#include "Mc32Debounce.h"
-#include "MenuGen.h"
-#include "Generateur.h"
+
 
 // DOM-IGNORE-BEGIN
 #ifdef __cplusplus  // Provide C++ Compatibility
@@ -90,22 +86,39 @@ extern "C" {
     determine the behavior of the application at various times.
 */
 
+/* Number of cycle to wait before doing action */
+#define START_NB_CYCLES 3000
+
+/* Number of cycles to run action after start */
+#define RUN_NB_CYCLES 10
+
+/* Number of cycles needed to confirm a save */
+#define SAVE_PRESS_CYCLES 1000
+
+/* Number of cycles to wait when leaving the save menu */
+#define SAVE_WAIT_CYCLES 2000
+
+/* LEDS used for debugging the programm */    
+#define DEBUG_LED_DEBOUNCE BSP_LED_0
+    
 typedef enum
 {
 	/* Application's state machine's initial state. */
-	APPGEN_STATE_INIT=0,
-    APPGEN_STATE_WAIT=1,
-	APPGEN_STATE_SERVICE_TASKS=2
-
-	/* TODO: Define states used by the application state machine. */
-
+	APPGEN_STATE_INIT,
+    APPGEN_STATE_WAIT,
+	APPGEN_STATE_SERVICE_TASKS,
 } APPGEN_STATES;
 
+/* Service tasks state machine used in Application */
+typedef enum
+{
+    SERVICE_STATE_START,
+    SERVICE_STATE_RUN,
+    SERVICE_STATE_SAVE_WAIT,
+    SERVICE_STATE_SAVE_EXECUTE,
+    SERVICE_STATE_SAVE_LEAVE    
+}SERVICE_STATES;
 
-extern bool tcpStat;
-
-extern S_ParamGen LocalParamGen;
-extern S_ParamGen TCPParamGen;
 
 // *****************************************************************************
 /* Application Data
@@ -124,10 +137,30 @@ typedef struct
 {
     /* The application's current state */
     APPGEN_STATES state;
-
-    /* TODO: Define any additional data used by the application. */
+    SERVICE_STATES state_service;
+    uint16_t cycles;
+    bool newCharReceived;
+    char newChar;
 
 } APPGEN_DATA;
+
+extern bool tcpStat;
+
+//extern S_ParamGen LocalParamGen;
+//extern S_ParamGen RemoteParamGen;
+
+// *****************************************************************************
+/* Application Data
+
+  Summary:
+    Holds application data
+
+  Description:
+    This structure holds the application's data.
+
+  Remarks:
+    Application strings and buffers are be defined outside this structure.
+ */
 
 
 // *****************************************************************************
@@ -210,6 +243,7 @@ void APPGEN_Initialize ( void );
 
 void APPGEN_Tasks( void );
 void APPGEN_UpdateState ( APPGEN_STATES NewState) ;
+void APPGEN_USB( uint8_t *Buffer );
 
 #endif /* _APPGEN_H */
 

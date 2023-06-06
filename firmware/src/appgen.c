@@ -56,13 +56,17 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 #include "appgen.h"
 #include "app.h"
 #include "Mc32DriverLcd.h"
-
+#include "Inputs.h"
+#include "Generator.h"
+#include "Mc32NVMUtil.h"
+#include "I2C_Seeprom.h"
 #include "MenuGen.h"
 #include "Mc32gestSpiDac.h"
-#include "Mc32gestI2cSeeprom.h"
+#include "I2C_Seeprom.h"
 #include "Mc32_I2cUtilCCS.h"
 #include "DefMenuGen.h"
 #include "Mc32gest_SerComm.h"
+#include "Mc32Delays.h"
 
 // *****************************************************************************
 // *****************************************************************************
@@ -88,7 +92,7 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 APPGEN_DATA appgenData;
 
 S_ParamGen LocalParamGen;
-S_ParamGen TCPParamGen;
+S_ParamGen RemoteParamGen;
 
 bool tcpStat;
 
@@ -129,30 +133,12 @@ bool tcpStat;
 void APPGEN_Initialize ( void )
 {
     /* Place the App state machine in its initial state. */
-
-    //init lcd
-    lcd_init();
-    //lcd_init();
-    lcd_bl_on();
-
-    // Ecriture sur le LCD
-    lcd_gotoxy(1,1);
-    printf_lcd("TP5_IpGen_2022-23");
-    lcd_gotoxy(1,2);
-    printf_lcd("Subramaniyam");
-    lcd_gotoxy(1,3);
-    printf_lcd("Decrausaz");
-
+    /* Place the App state machine in its initial state. */
     appgenData.state = APPGEN_STATE_INIT;
-
-    //init drivers
-     DRV_TMR0_Initialize();
-     DRV_TMR1_Initialize();   
-     //DRV_TMR3_Initialize();   
-   
-    /* TODO: Initialize your application's state machine and other
-     * parameters.
-     */
+    appgenData.newCharReceived = false;
+    appgenData.newChar = 0;
+    appgenData.state_service = SERVICE_STATE_START;
+    appgenData.cycles = 0;
 }
 
 
@@ -166,39 +152,39 @@ void APPGEN_Initialize ( void )
 
 void APPGEN_Tasks ( void )
 {
-
+    static uint16_t counterS9 = 0;
+    
     /* Check the application's current state. */
     switch ( appgenData.state )
     {
         /* Application's initial state. */
         case APPGEN_STATE_INIT:
         {
-            //Synchronise les paramètres
-            TCPParamGen = LocalParamGen;
-
-            // Init SPI DAC
-            SPI_InitLTC2604();
-
-            //Init I2C
+            /* Peripherals initialisation */
             I2C_InitMCP79411();
+            SPI_InitLTC2604();
+            
+            lcd_init();            
+            InputsInit();
+            lcd_bl_on();
+            
+            GENSIG_Initialize(&LocalParamGen);
+            RemoteParamGen = LocalParamGen;
 
-            //Lecture des datas sauvegardés
-            //I2C_ReadSEEPROM(&RemoteParamGen , 0x00 ,16);
+            /* Initial display */
+            lcd_gotoxy(1,1);
+            printf_lcd("TP5_IpGen_2022-23");
+            lcd_gotoxy(1,2);
+            printf_lcd("Subramaniyam");
+            lcd_gotoxy(1,3);
+            printf_lcd("Decrausaz");
 
-            // Initialisation PEC12
-            Pec12Init();
-
-            // Initialisation du menu
-            MENU_Initialize(&LocalParamGen);
-
-            // Active les timers 
+            /* Going to wait until next interrupt */
+            appgenData.state = APPGEN_STATE_WAIT;
+            
+            /* Timers start */
             DRV_TMR0_Start();
             DRV_TMR1_Start();
-
-            //Mise à jour du signal fonction issue du générateur (Local))
-            GENSIG_UpdateSignal(&LocalParamGen);
-            
-            appgenData.state = APPGEN_STATE_WAIT;
             
            break;
         }
@@ -211,21 +197,152 @@ void APPGEN_Tasks ( void )
         
 
         case APPGEN_STATE_SERVICE_TASKS:
-        {        
-          if (tcpStat == false)
-          {
-           //Mode kit32
-           MENU_Execute(&LocalParamGen, true);
-          }
-          else if (tcpStat == true)
-          {
-           //Mode appli C#
-           MENU_Execute(&TCPParamGen, false);
-          }
-          
-          appgenData.state = APPGEN_STATE_WAIT;
+        {
+            /* Increment number of cycles */
+            appgenData.cycles++;
             
-            break;
+            /* Service tasks state machine */
+            switch(appgenData.state_service)
+            {
+                /* First time in service tasks waits for 3 sec ****************/
+                case SERVICE_STATE_START:
+                {
+                    /* Waiting to reach a certain time */
+                    if(appgenData.cycles > START_NB_CYCLES)
+                    {
+                        /* Reset cycles */
+                        appgenData.cycles = 0;
+                        appgenData.state_service = SERVICE_STATE_RUN;
+                    }
+                    break;
+                }
+                /**************************************************************/
+                
+                /* Service tasks running every interrupt cycle after 3sec *****/
+                case SERVICE_STATE_RUN:
+                {
+                    ScanAllInputs();
+                    
+                    /* Go to save menu when button released */
+                    if( BtnSavePress() )
+                    {
+                        BtnSaveClearPress();
+                        appgenData.state_service = SERVICE_STATE_SAVE_WAIT;
+                    }
+
+                    /* Update display every 10 cycles */
+                    if(appgenData.cycles > RUN_NB_CYCLES)
+                    {
+                        /* Menu execution */
+                        if(USB_DETECT)
+                            MENU_Execute(&RemoteParamGen, false);
+                        else
+                            MENU_Execute(&LocalParamGen, true);
+
+                        /* Reset number of cycles */
+                        appgenData.cycles = 0;
+                    }                    
+                    break;
+                }
+                /**************************************************************/
+                
+                /* Temporary state waiting for button to be FULLY released ****/
+                case SERVICE_STATE_SAVE_WAIT:
+                {
+                    /* Scan save button */
+                    ScanBtnSave();
+                    
+                    /* When button is released */
+                    if( BtnSaveRelease() )
+                    {
+                        BtnSaveClearRelease();
+                        
+                        /* Clear all LCD lines */
+                        lcd_ClearLine(1);
+                        lcd_ClearLine(2);
+                        lcd_ClearLine(3);
+                        lcd_ClearLine(4);
+
+                        /* Display the save menu */
+                        lcd_gotoxy(1,2);
+                        printf_lcd("     SAUVEGARDE     ");
+                        lcd_gotoxy(1,3);
+                        printf_lcd("   (Appuyez 1sec)   ");
+                        lcd_bl_on();
+                        
+                        appgenData.state_service = SERVICE_STATE_SAVE_EXECUTE;
+                    }
+                    break;
+                }
+                /**************************************************************/
+                
+                /* Execute save when condition reached ************************/
+                case SERVICE_STATE_SAVE_EXECUTE:
+                {
+                    /* Scan save button */
+                    ScanBtnSave();
+                    
+                    /* Increment counter as long as the button is pressed */
+                    if(BtnSaveValue() == 0)
+                        counterS9++;
+                    
+                    /* Execute (or dont) SAVE when releasing button */
+                    if( BtnSaveRelease() )
+                    {
+                        /* Going to write on lcd whatever happens */
+                        lcd_gotoxy(1, 3);
+                        
+                        /* Execute SAVE if pressed > 1sec */
+                        if(counterS9 > SAVE_PRESS_CYCLES)
+                        {
+                            I2C_WriteSEEPROM(&LocalParamGen, MCP79411_EEPROM_BEG, sizeof(S_ParamGen));                  
+                            printf_lcd("    O VALIDEE O   ");
+                        }
+                        /* Leave without SAVE if < 1sec */
+                        else
+                        {
+                            printf_lcd("    X ANNULEE X  ");                           
+                        }
+
+                        /* Reset counter and cycles */
+                        counterS9 = 0;
+                        appgenData.cycles = 0;
+                        
+                        /* Next state */
+                        appgenData.state_service = SERVICE_STATE_SAVE_LEAVE;
+                    }
+                    break;
+                }
+                /**************************************************************/
+                
+                /* Temporary state when save has been executed ****************/
+                case SERVICE_STATE_SAVE_LEAVE:
+                {
+                    /* Waiting for a certain time after executing save */
+                    if(appgenData.cycles >= SAVE_WAIT_CYCLES)
+                    {
+                        /* Get back to the original MENU */
+                        MENU_Initialize(&LocalParamGen);
+                        Pec12ClearInactivity();
+                         
+                        /* Going back to RUN state */
+                        appgenData.state_service = SERVICE_STATE_RUN;
+                    }
+                    break;
+                }
+                /**************************************************************/
+                
+                /* Handling errors in SERVICE_TASKS ***************************/
+                default:
+                {
+                    break;
+                }
+                /**************************************************************/
+            }
+
+            /* Go to wait until next interrupt */
+            appgenData.state = APPGEN_STATE_WAIT;
+            break;         
         }
 
         /* TODO: implement your application state machine.*/
@@ -243,7 +360,38 @@ void APPGEN_Tasks ( void )
  //mise à jour des états
 void APPGEN_UpdateState ( APPGEN_STATES NewState )
 {
- appgenData.state  = NewState;
+    appgenData.state  = NewState;
+}
+
+void APPGEN_USB( uint8_t *Buffer )
+{    
+    /* Flag if save needed */
+    bool saveToDo = false;
+    
+    /* Get message from UART */
+    GetMessage(Buffer, &RemoteParamGen, &saveToDo);
+    
+    GENSIG_UpdateSignal(&RemoteParamGen);
+    //GENSIG_Execute();
+
+    if(saveToDo)
+    {
+        I2C_WriteSEEPROM(&RemoteParamGen, MCP79411_EEPROM_BEG, sizeof(S_ParamGen));
+        
+        lcd_ClearLine(1);
+        lcd_ClearLine(2);
+        lcd_ClearLine(3);
+        lcd_ClearLine(4);
+        
+        lcd_gotoxy(4, 2);
+        printf_lcd("Sauvegarde OK");
+        
+        delay_ms(800);
+                
+        MENU_Initialize(&RemoteParamGen);
+    }
+    
+    SendMessage(Buffer, &RemoteParamGen, saveToDo);
 }
 
 /*******************************************************************************

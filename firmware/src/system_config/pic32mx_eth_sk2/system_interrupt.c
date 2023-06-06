@@ -63,6 +63,7 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 #include "app.h"
 #include "appgen.h"
 #include "system_definitions.h"
+#include "Generator.h"
 #include "driver/tmr/drv_tmr_static.h"
 
 // *****************************************************************************
@@ -84,8 +85,6 @@ void __ISR(_TIMER_1_VECTOR, ipl3AUTO) IntHandlerDrvTmrInstance1(void)
         APPGEN_UpdateState(APPGEN_STATE_WAIT);
         init ++;
     }
-    
-    ScanPec12(PEC12_A,PEC12_B,PEC12_PB);
     
     PLIB_INT_SourceFlagClear(INT_ID_0,INT_SOURCE_TIMER_1);
 }

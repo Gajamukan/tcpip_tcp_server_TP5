@@ -1,42 +1,77 @@
-// Ecole supérieure SL229_MINF TP
-// Manipulation Tp3_MenuGen
-// Créé le 9 Mai 2006 CHR
-// Version 2016  du 03.02.2016
-// Modif 2015 : utilisation de stdint.h
-// Modif 2016 : ajout Duty pour PWM
-// Modif 2018 SCA : suppression PWM et duty
-// Definition pour le menuGen
+/*******************************************************************************
+ *  _______  ___________  ___  ___   __               _______      _______ 
+ * |   ____||           ||   \/   | |  |             |   ____|    /       |
+ * |  |__   `---|  |----`|  \  /  | |  |      ______ |  |__      |   (----`
+ * |   __|      |  |     |  |\/|  | |  |     |______||   __|      \   \    
+ * |  |____     |  |     |  |  |  | |  `----.        |  |____ .----)   |   
+ * |_______|    |__|     |__|  |__| |_______|        |_______||_______/                                                      
+ * 
+ * @file DefMenuGen.h
+ * @brief 
+ * 
+ * Definition used for the generator menu
+ * 
+ * @author Miguel Santos
+ * @author Ali Zoubir
+ * 
+ * @date 14.03.2023
+ * 
+ ******************************************************************************/
 
 #ifndef DEFMENUGEN_H
 #define DEFMENUGEN_H
 
 #include <stdint.h>
 
+/* Abracadabra ! */
+/* Used to verify integrity of memory messages */
 #define MAGIC 0x123455AA
 
-typedef enum  { SignalSinus, SignalTriangle, SignalCarre, SignalDentDeScie} E_FormesSignal;
+/* Parameters extreme values*/
+#define FREQ_MIN 20
+#define FREQ_MAX 2000
 
+#define AMP_MIN 0
+#define AMP_MAX 10000
+#define AMP_DELTA (AMP_MAX - AMP_MIN)
 
-typedef enum  { Select_Forme, Select_Freq, Select_Ampli, Select_Offset, Set_Forme, Set_Freq, Set_Ampli, Set_Offset } E_Switch;
+#define OFFSET_MIN -5000
+#define OFFSET_MAX 5000
+#define OFFSET_DELTA (OFFSET_MAX - OFFSET_MIN)
 
+/* Display space used by parameters */
+#define NAME_LENGTH 11
+#define HEAD_LENGTH 7
+#define VALUE_LENGTH 6
+#define UNIT_LENGTH 3
 
-// Structure des paramètres du générateur
+/* X Position of strings on the LCD */
+#define HEAD_POS 2
+#define EQUAL_POS (HEAD_POS + HEAD_LENGTH)
+#define VALUE_POS (EQUAL_POS + 2)
+#define UNIT_POS (VALUE_POS + VALUE_LENGTH + 1)
+
+/**/
+typedef enum  {
+    SignalSinus,
+    SignalTriangle,
+    SignalDentDeScie,
+    SignalCarre
+} E_SignalShapes;
+
+/* Generator parameters structure */
 typedef struct {
-      E_FormesSignal Forme;
-      int16_t Frequence;
-      int16_t Amplitude;
-      int16_t Offset;
-      uint32_t Magic;
+    uint32_t Magic;
+    E_SignalShapes shape;
+    union{
+        struct{
+            uint8_t name;
+            int16_t frequency;
+            int16_t amplitude;
+            int16_t offset;
+        }data;    
+        int16_t key[4];        
+    }parameters;
 } S_ParamGen;
-
-typedef struct {
-      char C_Forme;
-      char C_Freq;
-      char C_Ampli;
-      char C_Offset;
-} S_Curseur;
-
-
-extern S_ParamGen Test; 
 
 #endif

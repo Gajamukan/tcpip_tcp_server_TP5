@@ -330,11 +330,12 @@ build/pic32mx_eth_sk2/production/_ext/1360937237/appgen.o: \
  ../../../../../framework/driver/ethmac/drv_ethmac.h \
  ../../../../../framework/driver/miim/drv_miim.h ../src/app.h \
  ../src/system_config/pic32mx_eth_sk2/framework/driver/tmr/drv_tmr_static.h \
- ../src/appgen.h ../src/DefMenuGen.h ../src/GesPec12.h \
- ../src/Mc32Debounce.h ../src/MenuGen.h ../src/app.h ../src/Generateur.h \
- ../../../../../bsp/pic32mx_skes/Mc32DriverLcd.h ../src/Mc32gestSpiDac.h \
- ../src/Mc32gestI2cSeeprom.h ../src/Mc32_I2cUtilCCS.h \
- ../src/Mc32gest_SerComm.h
+ ../src/appgen.h ../src/DefMenuGen.h ../src/app.h \
+ ../../../../../bsp/pic32mx_skes/Mc32DriverLcd.h ../src/Inputs.h \
+ ../src/Generator.h ../src/Mc32NVMUtil.h ../src/I2C_Seeprom.h \
+ ../src/Mc32_I2cUtilCCS.h ../src/MenuGen.h ../src/Debounce.h \
+ ../src/Mc32gestSpiDac.h ../src/Mc32gest_SerComm.h \
+ ../../../../../bsp/pic32mx_skes/Mc32Delays.h
 
 ../src/appgen.h:
 
@@ -1004,22 +1005,26 @@ build/pic32mx_eth_sk2/production/_ext/1360937237/appgen.o: \
 
 ../src/DefMenuGen.h:
 
-../src/GesPec12.h:
-
-../src/Mc32Debounce.h:
-
-../src/MenuGen.h:
-
 ../src/app.h:
-
-../src/Generateur.h:
 
 ../../../../../bsp/pic32mx_skes/Mc32DriverLcd.h:
 
-../src/Mc32gestSpiDac.h:
+../src/Inputs.h:
 
-../src/Mc32gestI2cSeeprom.h:
+../src/Generator.h:
+
+../src/Mc32NVMUtil.h:
+
+../src/I2C_Seeprom.h:
 
 ../src/Mc32_I2cUtilCCS.h:
 
+../src/MenuGen.h:
+
+../src/Debounce.h:
+
+../src/Mc32gestSpiDac.h:
+
 ../src/Mc32gest_SerComm.h:
+
+../../../../../bsp/pic32mx_skes/Mc32Delays.h:

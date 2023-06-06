@@ -1,345 +1,292 @@
-   // Tp4 UsbGen
-// C. HUBER  10/02/2015 pour SLO2 2014-2015
-// Fichier MenuGen.c
-// Gestion du menu  du générateur
-// Traitement cyclique à 10 ms
+/*******************************************************************************
+ *  _______  ___________  ___  ___   __               _______      _______ 
+ * |   ____||           ||   \/   | |  |             |   ____|    /       |
+ * |  |__   `---|  |----`|  \  /  | |  |      ______ |  |__      |   (----`
+ * |   __|      |  |     |  |\/|  | |  |     |______||   __|      \   \    
+ * |  |____     |  |     |  |  |  | |  `----.        |  |____ .----)   |   
+ * |_______|    |__|     |__|  |__| |_______|        |_______||_______/                                                      
+ * 
+ * @file MenuGen.c
+ * @brief 
+ * 
+ * Manage generator menu display
+ * Cyclic call every 10ms
+ * 
+ * @author Miguel Santos
+ * @author Ali Zoubir
+ * 
+ * @date 14.03.2023
+ * 
+ ******************************************************************************/
 
-#include <stdint.h>                   
-#include <stdbool.h>
+#include <string.h>
 #include "MenuGen.h"
-#include "DefMenuGen.h"
-#include "appgen.h"
-#include "Generateur.h"
-#include "Mc32DriverLcd.h"
-#include "Mc32gest_SerComm.h"
-#include "GesPec12.h"
+#include "Generator.h"
 
+/* Array storing informations about each line of menu */
+S_MenuParameters A_MenuParameters[4] = {
+    {.minValue = 0,          .maxValue = 3,           .step = 1},
+    {.minValue = FREQ_MIN,   .maxValue = FREQ_MAX,    .step = 20},
+    {.minValue = AMP_MIN,    .maxValue = AMP_MAX,     .step = 100},
+    {.minValue = OFFSET_MIN, .maxValue = OFFSET_MAX,  .step = 100}
+};
 
-S_ParamGen valParamGen;
-//S_ParamGen RemoteParamGen;
-S_Pec12_Descriptor S_Pec12_fonction;
-S_Curseur Curseur;
+/* Display strings for the shape parameter */
+const char menuShapes[4][NAME_LENGTH] = {"Sinus", "Triangle", "DentDeScie", "Carre"};
+const char menuHeads[4][HEAD_LENGTH] = {"Forme", "Freq", "Ampl", "Offset"};
+const char menuUnits[4][UNIT_LENGTH] = {"", "Hz", "mV", "mV"};
 
-E_Switch State = Select_Forme;
+/* Menu's index going from 0 to 3 */
+S_MenuIndex menuIndex = {.old = 1 , .now = 0};
 
-//Déclaration
-const char MenuFormes[4][21] = {"Sinus","Triangle","Carre","DentDeScie"};
-int i = 0;
-int valFreq, valAmpli, valOffset;
+/* Menu's state */
+E_MenuState menuState = MENU_STATE_INIT;
 
-// Initialisation du menu et des paramètres
+/**
+ * Menu initial state
+ * @param pParam
+ */
 void MENU_Initialize(S_ParamGen *pParam)
 {
-    pParam->Forme = 0;
-    valFreq = 1000;
-    valAmpli = 10000;
-
+    uint8_t line;
+    
+    /* Clear and display the menu */
+    for(line = 1; line <= 4; line++)
+    {
+        lcd_ClearLine(line);
+        MENU_DisplayLine(pParam, line);
+    }
+ 
+    MENU_DisplayStar();
 }
 
+
 // Execution du menu, appel cyclique depuis l'application
-void MENU_Execute(S_ParamGen *pParam, bool local)
-{       
-    //mode remote
-    if (local == false)
+void MENU_Execute(S_ParamGen *pParam, bool Local)
+{
+    /* Generator parameters save */
+    static int16_t saveParam;
+
+    /* Selected paramaters value */
+    static int16_t *pCurrentParam;
+    
+    /* Iterance variable for remote state */
+    uint8_t i_rem;
+
+    switch(menuState)
     {
-      Curseur.C_Forme = '#';
-      Curseur.C_Freq = '#';
-      Curseur.C_Ampli = '#';
-      Curseur.C_Offset = '#';
-      
-      //mise à jour des variables pour l'affichage
-      i = pParam->Forme;
-      valFreq = pParam->Frequence;
-      valAmpli = pParam->Amplitude;
-      valOffset = pParam->Offset;
-      
-      //Mise à jour du signal fonction issue du générateur (Remote)
-//      GENSIG_UpdateSignal(&RemoteParamGen);
-    }
-     
-    else if (local == true)
-    {
-      switch (State)
-      { 
-       case Select_Forme:
-
-        Curseur.C_Forme = '*';
-        Curseur.C_Freq = ' ';
-        Curseur.C_Ampli = ' ';
-        Curseur.C_Offset = ' ';
-
-        //Incrémentation et décrémentation sélection menu
-        if(Pec12IsPlus() == true)
+        case MENU_STATE_INIT:
         {
-         State = Select_Freq;                 
+            MENU_Initialize(pParam);            
+            GENSIG_UpdateSignal(pParam);            
+            menuState = MENU_STATE_NAVIGATION;            
+            break;
         }
-        if(Pec12IsMinus() == true )
-        {
-         State = Select_Offset; 
-        }
-        if(Pec12IsOK() == true)
-        {    
-         State = Set_Forme;                    
-        }       
-       break;
-        
-       //Choix forme
-       case Set_Forme:
-
-        Curseur.C_Forme = '?';
-        Curseur.C_Freq = ' ';
-        Curseur.C_Ampli = ' ';
-        Curseur.C_Offset = ' ';
-        
-        //Incrémentation et décrémentation choix forme
-        if(Pec12IsPlus() == true )
-        {
-         i++;
-         if (i > 3)
-         {    
-           i = 0;
-         }               
-        }
-        if(Pec12IsMinus() == true )
-        {
-         i--;
-         if (i < 0)
-         {    
-          i = 3;
-         }
-        }
-        
-        //Validation forme
-        if(Pec12IsOK() == true)
-        { 
-         pParam->Forme = i;  
-         GENSIG_UpdateSignal(&valParamGen);
-         State = Select_Forme;
-        }
-        //sortir sans valider
-        if(Pec12IsESC() == true)
-        { 
-         i = pParam->Forme;
-         State = Select_Forme; 
-        }  
-       break;      
-
-       case Select_Freq:
-
-        Curseur.C_Forme = ' ';
-        Curseur.C_Freq = '*';
-        Curseur.C_Ampli = ' ';
-        Curseur.C_Offset = ' ';
-
-        if(Pec12IsPlus() == true )
-        {  
-         State = Select_Ampli;
-        }
-        if(Pec12IsMinus() == true )
-        { 
-         State = Select_Forme;
-        }
-        if(Pec12IsOK() == true)
-        { 
-         State = Set_Freq;
-        }
-       break;
-       
-       //Choix fréquence
-       case Set_Freq:
-
-        Curseur.C_Forme = ' ';
-        Curseur.C_Freq = '?';
-        Curseur.C_Ampli = ' ';
-        Curseur.C_Offset = ' ';
-
-        if(Pec12IsPlus() == true )
-        {
-         valFreq = valFreq + 20;
-        }
-        if(Pec12IsMinus() == true )
-        {
-         valFreq = valFreq - 20;
-        }
-
-        //Rebouclement de la fréquence
-        if (valFreq  > 2000)
-        {
-         valFreq = 20;
-        }
-        if (valFreq  < 20)
-        {
-         valFreq  = 2000;
-        }
-        //Validation de la valeur de fréquence
-        if(Pec12IsOK() == true)
-        { 
-         State = Select_Freq;
-         valParamGen.Frequence = valFreq ;
-         GENSIG_UpdatePeriode(&valParamGen);
-        }
-        if(Pec12IsESC() == true)
-        {      
-         State = Select_Freq;
-         valFreq = valParamGen.Frequence ;
-        }
-       break;
-
-       case Select_Ampli:
-
-        Curseur.C_Forme = ' ';
-        Curseur.C_Freq = ' ';
-        Curseur.C_Ampli = '*';
-        Curseur.C_Offset = ' ';
-        
-        if(Pec12IsPlus() == true )
-        {
-         State = Select_Offset;
-        }
-        if(Pec12IsMinus() == true )
-        {
-         State = Select_Freq;
-        }
-        if(Pec12IsOK() == true)
-        { 
-         State = Set_Ampli;
-        }
-       break;
-        
-       //Choix Amplitude
-       case Set_Ampli:
+         
+        /* ------------------- Navigation inside the menu ------------------- */
+        case MENU_STATE_NAVIGATION:
+        {            
+            menuIndex.old = menuIndex.now;
             
-        Curseur.C_Forme = ' ';
-        Curseur.C_Freq = ' ';
-        Curseur.C_Ampli = '?';
-        Curseur.C_Offset = ' ';   
-
-        if(Pec12IsPlus() == true )
-        {
-          valAmpli=valAmpli+100 ;
+            /* Increment or decrement detection -------- */
+            if(Pec12IsInc())
+            {
+                Pec12ClearInc();
+                menuIndex.now++;
+            }
+            else if(Pec12IsDec())
+            {
+                Pec12ClearDec();
+                menuIndex.now--;
+            }
+            /* ----------------------------------------- */
+            
+            /* Star position update -------------------- */
+            if(menuIndex.old != menuIndex.now)    
+                MENU_DisplayStar();
+            /* ----------------------------------------- */
+            
+            /* OK action leads to selection ------------ */
+            if(Pec12IsOK())
+            {
+                /* Debounce Reset */
+                Pec12ClearOK();
+                
+                /* Add selection symbol to the current index */
+                lcd_gotoxy(1,(menuIndex.now + 1));
+                printf_lcd("?");
+                
+                /* Save current configuration */
+                saveParam = pParam->parameters.key[menuIndex.now];
+                
+                /* Go into selection mode */
+                menuState = MENU_STATE_SELECTION;
+            }
+            /* ----------------------------------------- */
+             
+          break;
         }
-        if(Pec12IsMinus() == true )
-        {    
-          valAmpli=valAmpli-100 ;
-        }
+        /* -------------------------------------------------------------------*/
         
-        //Rebouclement de l'amplitude
-        if (valAmpli > 10000)
-        {
-          valAmpli = 0;                
-        }
-        if (valAmpli < 0)
-        {
-          valAmpli = 10000;                
-        }
+        /* -------------------------- Value select -------------------------- */
+        case MENU_STATE_SELECTION:
+        {            
+            /* Pointing to current parameter value */
+            pCurrentParam = &pParam->parameters.key[menuIndex.now];
+            
+            /* Increment or decrement detection */
+            if(Pec12IsInc())
+            {
+                /* Debounce Reset */
+                Pec12ClearInc();
 
-        if(Pec12IsOK() == true)
-        { 
-          valParamGen.Amplitude = valAmpli;
-          GENSIG_UpdateSignal(&valParamGen);
-          State = Select_Ampli;
-        }
-        if(Pec12IsESC() == true)
-        {                    
-          State = Select_Ampli;
-          valAmpli = valParamGen.Amplitude;
-        }                    
-       break;
+                /* Increment with loop back */
+                if(*pCurrentParam < A_MenuParameters[menuIndex.now].maxValue)
+                    *pCurrentParam += A_MenuParameters[menuIndex.now].step;
+                else if(menuIndex.now == 3)
+                    *pCurrentParam = A_MenuParameters[menuIndex.now].maxValue;
+                else
+                    *pCurrentParam = A_MenuParameters[menuIndex.now].minValue;
 
-       case Select_Offset:
+                /* Update the value on display */
+                MENU_DisplayValue(pParam, menuIndex.now + 1);
+            }
+            else if(Pec12IsDec())
+            {
+                /* Debounce Reset */
+                Pec12ClearDec();
 
-        Curseur.C_Forme = ' ';
-        Curseur.C_Freq = ' ';
-        Curseur.C_Ampli = ' ';
-        Curseur.C_Offset = '*';
+                /* Decrement with loop back */
+                if(*pCurrentParam > A_MenuParameters[menuIndex.now].minValue)
+                    *pCurrentParam -= A_MenuParameters[menuIndex.now].step;
+                else if(menuIndex.now == 3)
+                    *pCurrentParam = A_MenuParameters[menuIndex.now].minValue;
+                else
+                    *pCurrentParam = A_MenuParameters[menuIndex.now].maxValue;
 
-        if(Pec12IsPlus() == true )
-        {
-         State = Select_Forme;
-        }
-        if(Pec12IsMinus() == true )
-        {
-         State = Select_Ampli;
-        }
-        if(Pec12IsOK() == true)
-        {                    
-         State = Set_Offset; 
-        }
-       break;
+                /* Update the value on display */
+                MENU_DisplayValue(pParam, menuIndex.now + 1);
+            }
+            /* If pressure on OK */
+            else if(Pec12IsOK())
+            {   
+                Pec12ClearOK();
 
-        //Paramétrage de l'offset
-       case Set_Offset:
+                /* Add navigation star to the current index */
+                MENU_DisplayStar();
+                
+                GENSIG_UpdateSignal(pParam);
+                
+                /* Go into navigation mode */
+                menuState = MENU_STATE_NAVIGATION;
+            }
+            else if(Pec12IsESC())
+            {
+                /* Clear flag */
+                Pec12ClearESC();
+                
+                /* Restore saved parameters */
+                pParam->parameters.key[menuIndex.now] = saveParam;
 
-        Curseur.C_Forme = ' ';
-        Curseur.C_Freq = ' ';
-        Curseur.C_Ampli = ' ';
-        Curseur.C_Offset = '?';     
+                /* Add navigation star to the current index */
+                MENU_DisplayStar();
+                
+                /* Update the value on display */
+                MENU_DisplayValue(pParam, menuIndex.now + 1);
+                
+                /* Go into navigation mode */
+                menuState = MENU_STATE_NAVIGATION;
+            }
+            
+            break;
+        }
+        /* -------------------------------------------------------------------*/
+        case MENU_STATE_REMOTE:
+            
+            /* Waiting for local state */
+            if(Local)
+            {
+                for(i_rem = 1; i_rem < 5; i_rem++)
+                {
+                    MENU_DisplayValue(pParam, i_rem);
+                    lcd_gotoxy(1, i_rem);
+                    printf_lcd(" ");
+                }
+                menuState = MENU_STATE_NAVIGATION;
+            }
+            else
+            {
+                for(i_rem = 1; i_rem < 5; i_rem++)
+                {
+                    MENU_DisplayValue(pParam, i_rem);
+                    lcd_gotoxy(1, i_rem);
+                    printf_lcd("#");
+                }
+            }
+            
+            break;
+        
+        default:
+            break;
+    }
 
-        //Rotation Pec12
-        if(Pec12IsPlus() == true )
-        {                  
-         valOffset = valOffset +100 ;
-        }
-        if(Pec12IsMinus() == true )
-        { 
-         valOffset = valOffset -100 ;
-        }
-        //Rebouclement de l'offset
-        if (valOffset > 5000)
-        {
-          valOffset = 5000;                
-        }
-        if (valOffset < -5000)
-        {
-          valOffset = -5000;                
-        }
-        //Pression Pec12
-        if(Pec12IsOK() == true)
-        { 
-          valParamGen.Offset = valOffset;
-          GENSIG_UpdateSignal(&valParamGen);
-          State = Select_Offset;
-        }
-        if(Pec12IsESC() == true)
-        { 
-           valOffset = valParamGen.Offset;
-           State = Select_Offset;
-        }
-       break;    
-      }
+    /* Backlight based on inactivity and local state */
+    if(Pec12NoActivity() && Local)
+        lcd_bl_off();
+    else
+        lcd_bl_on();
+
+    /* Automatic state change when not on local */
+    if(!Local)
+        menuState = MENU_STATE_REMOTE;
+}
+
+void MENU_DisplayLine(S_ParamGen *pParam, uint8_t lcdLine)
+{    
+    /* Header of the line */
+    lcd_gotoxy(HEAD_POS, lcdLine);
+    printf_lcd(menuHeads[lcdLine - 1]);
     
-      /*if(Pec12NoActivity()== true)
-      {   
-       lcd_bl_off();
-      }   
-      else if (Pec12NoActivity()== false)
-      { 
-       lcd_bl_on();
-      } */
-      
-      Pec12ClearInactivity();
-      Pec12ClearPlus();
-      Pec12ClearESC();
-      Pec12ClearOK();
-      Pec12ClearMinus();
-      S9ClearOK();
-    } 
+    /* Equal symbol */
+    lcd_gotoxy(EQUAL_POS, lcdLine);
+    printf_lcd("=");
     
-   //Affichage
-   lcd_ClearLine(1);              //Effacer la ligne
-   lcd_gotoxy(1,1);               //Ecrire sur la 1ère ligne du LCD
-   printf_lcd("%cForme = %s \n", Curseur.C_Forme, MenuFormes[i]); 
-   lcd_ClearLine(2);              //Effacer la ligne
-   lcd_gotoxy(1,2);                  
-   printf_lcd("%cFreq[Hz] = %4d \n", Curseur.C_Freq, valFreq); 
-   lcd_ClearLine(3);              //Effacer la ligne
-   lcd_gotoxy(1,3);
-   printf_lcd("%cAmpl[mV] = %5d \n", Curseur.C_Ampli, valAmpli);
-   lcd_gotoxy(1,4);
-   printf_lcd("%cOffset[mV] = %5d \n", Curseur.C_Offset, valOffset);    
-}    
+    /* Current value of generator */
+    MENU_DisplayValue(pParam, lcdLine);
+    
+    /* Unit */
+    lcd_gotoxy(UNIT_POS, lcdLine);
+    printf_lcd(menuUnits[lcdLine - 1]);
+}
 
+void MENU_DisplayValue(S_ParamGen *pParam, uint8_t lcdLine)
+{
+    lcd_gotoxy(VALUE_POS, lcdLine);
+    switch(lcdLine)
+    {
+        case 1:
+            printf_lcd("%-10s", menuShapes[pParam->parameters.key[lcdLine - 1]]);
+            break;
+            
+        case 2:
+        case 3:
+        case 4:
+            printf_lcd("%-+6d", pParam->parameters.key[lcdLine - 1]);
+            break;
+            
+        default:
+            break;
+    }
+}
 
+void MENU_DisplayStar()
+{
+    /* Remove symbol from the previous location */
+    lcd_gotoxy(1,(menuIndex.old + 1));
+    printf_lcd(" ");
 
-
+    /* Add symbol to the current index */
+    lcd_gotoxy(1,(menuIndex.now + 1));
+    printf_lcd("*");
+}
 
