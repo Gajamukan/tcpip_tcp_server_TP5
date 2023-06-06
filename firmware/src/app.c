@@ -146,9 +146,9 @@ void APP_Tasks ( void )
     int                 count = 0;
     TCPIP_NET_HANDLE    netH;
     
-    int16_t socket;
+//    int16_t socket;
     
-    tcpStat = TCPIP_TCP_IsConnected(socket);
+//    tcpStat = TCPIP_TCP_IsConnected(socket);
 
     SYS_CMD_READY_TO_READ();
     switch(appData.state)
