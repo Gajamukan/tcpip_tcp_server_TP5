@@ -283,7 +283,7 @@ extern "C" {
 
 /*** DHCP Configuration ***/
 #define TCPIP_STACK_USE_DHCP_CLIENT
-#define TCPIP_DHCP_TIMEOUT                          20
+#define TCPIP_DHCP_TIMEOUT                          15
 #define TCPIP_DHCP_TASK_TICK_RATE                   5
 #define TCPIP_DHCP_HOST_NAME_SIZE                   20
 #define TCPIP_DHCP_CLIENT_CONNECT_PORT              68
@@ -335,8 +335,8 @@ extern "C" {
 #define TCPIP_TCP_START_TIMEOUT_VAL		        	1000
 #define TCPIP_TCP_DELAYED_ACK_TIMEOUT		    		100
 #define TCPIP_TCP_FIN_WAIT_2_TIMEOUT		    		5000
-#define TCPIP_TCP_KEEP_ALIVE_TIMEOUT		    		10000
-#define TCPIP_TCP_CLOSE_WAIT_TIMEOUT		    		0
+#define TCPIP_TCP_KEEP_ALIVE_TIMEOUT		    		1000
+#define TCPIP_TCP_CLOSE_WAIT_TIMEOUT		    		1000
 #define TCPIP_TCP_MAX_RETRIES		            		5
 #define TCPIP_TCP_MAX_UNACKED_KEEP_ALIVES			6
 #define TCPIP_TCP_MAX_SYN_RETRIES		        	3

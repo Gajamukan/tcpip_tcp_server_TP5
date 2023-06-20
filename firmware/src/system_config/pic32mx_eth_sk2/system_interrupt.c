@@ -65,6 +65,7 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 #include "system_definitions.h"
 #include "Generator.h"
 #include "driver/tmr/drv_tmr_static.h"
+#include "Inputs.h"
 
 // *****************************************************************************
 // *****************************************************************************
@@ -74,17 +75,9 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
  
 uint16_t init = 0;
 
-void __ISR(_TIMER_1_VECTOR, ipl3AUTO) IntHandlerDrvTmrInstance1(void)
+void __ISR(_TIMER_1_VECTOR, ipl3AUTO) IntHandlerDrvTmr1(void)
 {
-    if (init >= 3000)
-    {   
-        APPGEN_UpdateState(APPGEN_STATE_SERVICE_TASKS);
-    }
-    else
-    {        
-        APPGEN_UpdateState(APPGEN_STATE_WAIT);
-        init ++;
-    }
+    APPGEN_UpdateState(APPGEN_STATE_SERVICE_TASKS);
     
     PLIB_INT_SourceFlagClear(INT_ID_0,INT_SOURCE_TIMER_1);
 }
@@ -94,9 +87,10 @@ void __ISR(_TIMER_2_VECTOR, ipl1AUTO) IntHandlerDrvTmrInstance0(void)
     DRV_TMR_Tasks(sysObj.drvTmr0);
 }
 
-void __ISR(_TIMER_3_VECTOR, ipl7AUTO) IntHandlerDrvTmrInstance2(void)
+void __ISR(_TIMER_3_VECTOR, ipl7AUTO) IntHandlerDrvTmrInstance1(void)
 {
     GENSIG_Execute();
+    
     PLIB_INT_SourceFlagClear(INT_ID_0,INT_SOURCE_TIMER_3);
 }
 

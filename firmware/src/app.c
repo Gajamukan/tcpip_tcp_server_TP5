@@ -81,7 +81,9 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 
 APP_DATA appData;
 
-bool tcpStat;
+bool tcpStat, flagIp;
+        
+IPV4_ADDR ipAddr;
 
 // *****************************************************************************
 // *****************************************************************************
@@ -141,15 +143,10 @@ void APP_Tasks ( void )
     SYS_STATUS          tcpipStat;
     const char          *netName, *netBiosName;
     static IPV4_ADDR    dwLastIP[2] = { {-1}, {-1} };
-    IPV4_ADDR           ipAddr;
+//    IPV4_ADDR           ipAddr;
     int                 i, nNets;
-    int                 count = 0;
     TCPIP_NET_HANDLE    netH;
     
-//    int16_t socket;
-    
-//    tcpStat = TCPIP_TCP_IsConnected(socket);
-
     SYS_CMD_READY_TO_READ();
     switch(appData.state)
     {
@@ -207,33 +204,28 @@ void APP_Tasks ( void )
                 {
                     dwLastIP[i].Val = ipAddr.Val;
                     
-                    //tcpStat = true;
+                    flagIp = true;
                     
                     SYS_CONSOLE_MESSAGE(TCPIP_STACK_NetNameGet(netH));
                     SYS_CONSOLE_MESSAGE(" IP Address: ");
                     SYS_CONSOLE_PRINT("%d.%d.%d.%d \r\n", ipAddr.v[0], ipAddr.v[1], ipAddr.v[2], ipAddr.v[3]);
    
-                    //ajout SCA : affichage adr. IP
-                    lcd_ClearLine(1);
-                    lcd_ClearLine(2);
-                    lcd_ClearLine(3);
-                    lcd_ClearLine(4);
-                       
-                    while(count <= 5000)
-                    {
-                       count ++;
+                      // Tests de la réception de l'adresse IP 
+//                    lcd_ClearLine(1);
+//                    lcd_ClearLine(2);
+//                    lcd_ClearLine(3);
+//                    lcd_ClearLine(4);  
+//
+//                    lcd_gotoxy(8,2);
+//                    printf_lcd("Adr. IP");
+//                    lcd_gotoxy(2,3);
+//                    printf_lcd("IP:%03d.%03d.%03d.%03d ", ipAddr.v[0], ipAddr.v[1], ipAddr.v[2], ipAddr.v[3]);     
 
-                       lcd_gotoxy(8,2);
-                       printf_lcd("Adr. IP");
-                       
-                       lcd_gotoxy(4,3);
-                       printf_lcd("%03d.%03d.%03d.%03d ", ipAddr.v[0], ipAddr.v[1], ipAddr.v[2], ipAddr.v[3]);     
-                    } 
-                    count = 0; 
                 }
                 appData.state = APP_TCPIP_OPENING_SERVER;
             }
             break;
+            
         case APP_TCPIP_OPENING_SERVER:
         {
             SYS_CONSOLE_PRINT("Waiting for Client Connection on port: %d\r\n", SERVER_PORT);
@@ -244,18 +236,13 @@ void APP_Tasks ( void )
                 break;
             } 
             
-            //Pour que le TCPIP_TCP_IsConnected() détecte la deconnexion du câble
-            
+            //keepAlive 
             appData.keepAlive.keepAliveEnable = true;
-            appData.keepAlive.keepAliveTmo = 1000; 
-            
+            appData.keepAlive.keepAliveTmo = 1000;  
             //[ms] / 0 => valeur par défaut
             appData.keepAlive.keepAliveUnackLim = 2; 
-            
             //[nb de tentatives] / 0 => valeur par défaut
-            TCPIP_TCP_OptionsSet(appData.socket, TCP_OPTION_KEEP_ALIVE, 
-            &(appData.keepAlive));
-            
+            TCPIP_TCP_OptionsSet(appData.socket, TCP_OPTION_KEEP_ALIVE, &(appData.keepAlive));
             
             appData.state = APP_TCPIP_WAIT_FOR_CONNECTION;
         }
@@ -265,12 +252,14 @@ void APP_Tasks ( void )
         {
             if (!TCPIP_TCP_IsConnected(appData.socket))
             {
+                //tcpStat = false; //Local
                 return;
             }
             else
             {
                 // We got a connection
-                appData.state = APP_TCPIP_SERVING_CONNECTION;
+                tcpStat = true; //Remote
+                appData.state = APP_TCPIP_SERVING_CONNECTION;               
                 SYS_CONSOLE_MESSAGE("Received a connection\r\n");
             }
         }
@@ -280,11 +269,12 @@ void APP_Tasks ( void )
         {
             if (!TCPIP_TCP_IsConnected(appData.socket))
             {
+                tcpStat = false; //Local
                 appData.state = APP_TCPIP_CLOSING_CONNECTION;
-                SYS_CONSOLE_MESSAGE("Connection was closed\r\n");
-                tcpStat = false;
+                SYS_CONSOLE_MESSAGE("Connection was closed\r\n"); 
                 break;
             }
+            
             int16_t wMaxGet, wMaxPut, wCurrentChunk;
             uint16_t w, w2;
             uint8_t AppBuffer[32];
@@ -293,8 +283,7 @@ void APP_Tasks ( void )
             wMaxPut = TCPIP_TCP_PutIsReady(appData.socket);	// Get TCP TX FIFO free space
 
             // Make sure we don't take more bytes out of the RX FIFO than we can put into the TX FIFO
-            if(wMaxPut < wMaxGet)
-                    wMaxGet = wMaxPut;
+            if(wMaxPut < wMaxGet) wMaxGet = wMaxPut;
 
             // Process all bytes that we can
             // This is implemented as a loop, processing up to sizeof(AppBuffer) bytes at a time.
@@ -303,8 +292,7 @@ void APP_Tasks ( void )
             for(w = 0; w < wMaxGet; w += sizeof(AppBuffer))
             {
                 // Make sure the last chunk, which will likely be smaller than sizeof(AppBuffer), is treated correctly.
-                if(w + sizeof(AppBuffer) > wMaxGet)
-                    wCurrentChunk = wMaxGet - w;
+                if(w + sizeof(AppBuffer) > wMaxGet) wCurrentChunk = wMaxGet - w;
 
                 // Transfer the data out of the TCP RX FIFO and into our local processing buffer.
                 TCPIP_TCP_ArrayGet(appData.socket, AppBuffer, wCurrentChunk);
@@ -320,11 +308,15 @@ void APP_Tasks ( void )
                     }
                     else if(i == '\e')   //escape
                     {
+                        tcpStat = false; //Local
                         appData.state = APP_TCPIP_CLOSING_CONNECTION;
                         SYS_CONSOLE_MESSAGE("Connection was closed\r\n");
                     }
                 }
-
+                
+                //  gestion msg   //
+                APPGEN_TCP(AppBuffer);
+                
                 // Transfer the data out of our local processing buffer and into the TCP TX FIFO.
                 SYS_CONSOLE_PRINT("Server Sending %s\r\n", AppBuffer);
                 TCPIP_TCP_ArrayPut(appData.socket, AppBuffer, wCurrentChunk);
@@ -333,15 +325,16 @@ void APP_Tasks ( void )
             }
         }
         break;
+        
         case APP_TCPIP_CLOSING_CONNECTION:
         {
             // Close the socket connection.
             TCPIP_TCP_Close(appData.socket);
             appData.socket = INVALID_SOCKET;
-            appData.state = APP_TCPIP_WAIT_FOR_IP;
-
+            appData.state = APP_TCPIP_WAIT_FOR_IP;  
         }
         break;
+        
         default:
             break;
     }

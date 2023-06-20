@@ -15,8 +15,8 @@
 // Fonction de reception  d'un  message
 // Met à jour les paramètres du generateur a partir du message recu
 // Format du message
-//  !S=TF=1000A=10000O=+5000W=0#
-//  !S=PF=2000A=10000O=-5000W=1#
+//  !S=TF=1000A=5000O=+5000W=0#
+//  !S=SF=2000A=10000O=-5000W=1#
 
 
 bool GetMessage(uint8_t *USBReadBuffer, S_ParamGen *pParam, bool *SaveTodo)

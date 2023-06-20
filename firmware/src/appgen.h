@@ -59,6 +59,10 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 #include "system_config.h"
 #include "system_definitions.h"
 #include "DefMenuGen.h" 
+#include "Debounce.h"
+#include "DefMenuGen.h"
+#include "Generator.h"
+#include "Inputs.h"
 
 
 // DOM-IGNORE-BEGIN
@@ -116,7 +120,10 @@ typedef enum
     SERVICE_STATE_RUN,
     SERVICE_STATE_SAVE_WAIT,
     SERVICE_STATE_SAVE_EXECUTE,
-    SERVICE_STATE_SAVE_LEAVE    
+    SERVICE_STATE_SAVE_LEAVE, 
+    SERVICE_STATE_ETH_LCDIP,
+    SERVICE_STATE_ETH_WAIT
+  
 }SERVICE_STATES;
 
 
@@ -243,7 +250,7 @@ void APPGEN_Initialize ( void );
 
 void APPGEN_Tasks( void );
 void APPGEN_UpdateState ( APPGEN_STATES NewState) ;
-void APPGEN_USB( uint8_t *Buffer );
+void APPGEN_TCP( uint8_t *Buffer );
 
 #endif /* _APPGEN_H */
 

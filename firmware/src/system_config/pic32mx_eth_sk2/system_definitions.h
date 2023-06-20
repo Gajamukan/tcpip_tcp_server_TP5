@@ -68,6 +68,7 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 #include "driver/miim/drv_miim.h"
 #include "app.h"
 #include "appgen.h"
+#include "framework/driver/tmr/drv_tmr_static.h" // ajout du driver static
 
 
 // DOM-IGNORE-BEGIN

@@ -36,6 +36,7 @@
 #define F_SYS 80000000
 #define TMR_MAX 65535
 
+
 uint16_t A_signalADC[100];
 
 /* Patern of all the different shapes */
@@ -48,6 +49,7 @@ const float A_shapesRef[4][100] = {{ 0.0, 0.0628, 0.1253, 0.1874, 0.2487, 0.309,
 /* Signal generator initialisation */
 void GENSIG_Initialize ( S_ParamGen *pParam )
 {
+
     I2C_ReadSEEPROM(pParam, MCP79411_EEPROM_BEG, sizeof(S_ParamGen));
     
     lcd_gotoxy(1, 4);
@@ -61,9 +63,9 @@ void GENSIG_Initialize ( S_ParamGen *pParam )
         printf_lcd("Memory FAILED !");
         pParam->Magic                       = MAGIC;
         pParam->shape                       = SignalSinus;
-        pParam->parameters.data.frequency   = FREQ_MIN;
-        pParam->parameters.data.amplitude   = AMP_MAX;
-        pParam->parameters.data.offset      = 0;    
+        pParam->parameters.data.frequency   = FREQ_TYP; //1000Hz
+        pParam->parameters.data.amplitude   = AMP_TYP;
+        pParam->parameters.data.offset      = 0;   //0 
     }
 }
   
@@ -142,73 +144,6 @@ void GENSIG_UpdateSignal ( S_ParamGen *pParam )
     
     GENSIG_UpdatePeriode(pParam);
 }
-
-///* Update signal with parameters */
-//void  GENSIG_UpdateSignal(S_ParamGen *pParam)
-//{
-//    uint16_t time = 0;
-//    float amplitude = 0;
-//    const float pulsation = 2 * 3.1415 / MAX_ECH;
-//    uint16_t offset = 0;
-//    uint32_t valADC = 0;
-//    
-//    for(time = 0; time < MAX_ECH; time++)
-//    {
-//        switch(pParam->parameters.data.name)
-//        {
-//            case SignalSinus:
-//                amplitude = (float)pParam->parameters.data.amplitude * sin(pulsation * time);
-//                amplitude = amplitude - pParam->parameters.data.offset;            
-//                break;
-//                
-//            case SignalCarre:
-//                if(time < (MAX_ECH / 2))
-//                {
-//                    amplitude = -(float)pParam->parameters.data.amplitude;
-//                    amplitude = amplitude - pParam->parameters.data.offset;
-//                }
-//                else
-//                {
-//                    amplitude = (float)pParam->parameters.data.amplitude;
-//                    amplitude = amplitude - pParam->parameters.data.offset;
-//                }
-//                break;
-//            
-//            case SignalTriangle:
-//                if(time < (MAX_ECH / 2))
-//                {
-//                    amplitude = -(float)pParam->parameters.data.amplitude;
-//                    amplitude += 2*(float)pParam->parameters.data.amplitude * (2*time) / MAX_ECH;
-//                    amplitude = amplitude - pParam->parameters.data.offset;
-//                }
-//                else
-//                {
-//                    amplitude = (float)pParam->parameters.data.amplitude;
-//                    amplitude -= 2*(float)pParam->parameters.data.amplitude * 2*(time - MAX_ECH/2) / MAX_ECH;
-//                    amplitude = amplitude - pParam->parameters.data.offset;
-//                }
-//                break;
-//            
-//            case SignalDentDeScie:
-//                amplitude = -(float)pParam->parameters.data.amplitude;
-//                amplitude += (float)pParam->parameters.data.amplitude * time / MAX_ECH;
-//                amplitude = amplitude - pParam->parameters.data.offset;
-//                
-//                break;
-//        }  
-//    
-//        valADC = (amplitude * MAX_ADC) / (2 * AMP_MAX);
-//        valADC += MAX_ADC / 2;
-//
-//        if(valADC > MAX_ADC)
-//            valADC = MAX_ADC;
-//        if(valADC < 0)
-//            valADC = 0;
-//
-//        A_signalADC[time] = (uint16_t)valADC;
-//    }
-//      
-//}
 
 /**
  * GENSIG_Execute

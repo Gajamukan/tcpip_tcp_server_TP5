@@ -29,9 +29,11 @@
 
 /* Parameters extreme values*/
 #define FREQ_MIN 20
+#define FREQ_TYP 1000
 #define FREQ_MAX 2000
 
 #define AMP_MIN 0
+#define AMP_TYP 5000
 #define AMP_MAX 10000
 #define AMP_DELTA (AMP_MAX - AMP_MIN)
 

@@ -63,10 +63,9 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 #include "MenuGen.h"
 #include "Mc32gestSpiDac.h"
 #include "I2C_Seeprom.h"
-#include "Mc32_I2cUtilCCS.h"
-#include "DefMenuGen.h"
 #include "Mc32gest_SerComm.h"
 #include "Mc32Delays.h"
+#include "system_config/pic32mx_eth_sk2/framework/driver/tmr/drv_tmr_static.h"
 
 // *****************************************************************************
 // *****************************************************************************
@@ -91,12 +90,14 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 
 APPGEN_DATA appgenData;
 
+IPV4_ADDR  ipAddr;
+
 S_ParamGen LocalParamGen;
 S_ParamGen RemoteParamGen;
 
-bool tcpStat;
+bool tcpStat, flagIp;
 
-// *****************************************************************************
+ // *****************************************************************************
 // *****************************************************************************
 // Section: Application Callback Functions
 // *****************************************************************************
@@ -132,6 +133,9 @@ bool tcpStat;
 
 void APPGEN_Initialize ( void )
 {
+    DRV_TMR0_Initialize();
+    DRV_TMR1_Initialize();
+    
     /* Place the App state machine in its initial state. */
     /* Place the App state machine in its initial state. */
     appgenData.state = APPGEN_STATE_INIT;
@@ -160,32 +164,32 @@ void APPGEN_Tasks ( void )
         /* Application's initial state. */
         case APPGEN_STATE_INIT:
         {
-            /* Peripherals initialisation */
-            I2C_InitMCP79411();
-            SPI_InitLTC2604();
-            
-            lcd_init();            
-            InputsInit();
+            /* Initial display */            
+            lcd_init();           
             lcd_bl_on();
             
-            GENSIG_Initialize(&LocalParamGen);
-            RemoteParamGen = LocalParamGen;
-
-            /* Initial display */
             lcd_gotoxy(1,1);
             printf_lcd("TP5_IpGen_2022-23");
             lcd_gotoxy(1,2);
             printf_lcd("Subramaniyam");
             lcd_gotoxy(1,3);
             printf_lcd("Decrausaz");
-
-            /* Going to wait until next interrupt */
-            appgenData.state = APPGEN_STATE_WAIT;
+                     
+            /* Peripherals initialisation */            
+            InputsInit();
+                 
+            I2C_InitMCP79411();
+            SPI_InitLTC2604();
             
+            GENSIG_Initialize(&LocalParamGen);
+            RemoteParamGen = LocalParamGen;
+
             /* Timers start */
             DRV_TMR0_Start();
             DRV_TMR1_Start();
             
+            /* Going to wait until next interrupt */
+            appgenData.state = APPGEN_STATE_WAIT;
            break;
         }
         
@@ -233,19 +237,64 @@ void APPGEN_Tasks ( void )
                     /* Update display every 10 cycles */
                     if(appgenData.cycles > RUN_NB_CYCLES)
                     {
+                        if(flagIp == 1)
+                        {
+                          flagIp = 0;
+                          appgenData.state_service = SERVICE_STATE_ETH_LCDIP; 
+                        }
                         /* Menu execution */
-                        if(USB_DETECT)
+                        if(tcpStat)
+                        {    
                             MENU_Execute(&RemoteParamGen, false);
+                        }
                         else
+                        { 
                             MENU_Execute(&LocalParamGen, true);
-
+                        }
                         /* Reset number of cycles */
                         appgenData.cycles = 0;
                     }                    
                     break;
                 }
                 /**************************************************************/
+                /* Execute save when condition reached ************************/
+                case SERVICE_STATE_ETH_LCDIP:
+                {
+                    lcd_ClearLine(1);
+                    lcd_ClearLine(2);
+                    lcd_ClearLine(3);
+                    lcd_ClearLine(4);
+                    
+                    //ajout SCA : affichage adr. IP   
+                    lcd_gotoxy(8,2);
+                    printf_lcd("Adr. IP");
+                       
+                    lcd_gotoxy(2,3);
+                    printf_lcd("IP:%03d.%03d.%03d.%03d ", ipAddr.v[0], ipAddr.v[1], ipAddr.v[2], ipAddr.v[3]);
+                        
+                    /* Next state */
+                    appgenData.state_service = SERVICE_STATE_ETH_WAIT;
+                    appgenData.cycles = 0;
+                    
+                    break;
+                }
+                /**************************************************************/
                 
+                /* Temporary state when save has been executed ****************/
+                case SERVICE_STATE_ETH_WAIT:
+                {                  
+                    /* Waiting for a certain time after executing save */
+                    if(appgenData.cycles >= 5000)
+                    {
+                        
+                        MENU_Initialize(&RemoteParamGen);
+                        
+                        /* Going back to RUN state */
+                        appgenData.state_service = SERVICE_STATE_RUN;
+                    }
+                    break;
+                }
+
                 /* Temporary state waiting for button to be FULLY released ****/
                 case SERVICE_STATE_SAVE_WAIT:
                 {
@@ -363,7 +412,7 @@ void APPGEN_UpdateState ( APPGEN_STATES NewState )
     appgenData.state  = NewState;
 }
 
-void APPGEN_USB( uint8_t *Buffer )
+void APPGEN_TCP( uint8_t *Buffer )
 {    
     /* Flag if save needed */
     bool saveToDo = false;
@@ -372,7 +421,6 @@ void APPGEN_USB( uint8_t *Buffer )
     GetMessage(Buffer, &RemoteParamGen, &saveToDo);
     
     GENSIG_UpdateSignal(&RemoteParamGen);
-    //GENSIG_Execute();
 
     if(saveToDo)
     {

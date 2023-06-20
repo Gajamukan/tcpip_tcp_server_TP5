@@ -205,6 +205,12 @@ void APP_Initialize ( void );
 
 void APP_Tasks ( void );
 
+extern IPV4_ADDR ipAddr;
+
+extern bool tcpStat;
+extern bool flagIp; 
+extern bool flagStat;
+
 
 #endif /* _APP_H */
 /*******************************************************************************

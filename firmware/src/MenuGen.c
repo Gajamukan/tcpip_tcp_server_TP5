@@ -205,14 +205,13 @@ void MENU_Execute(S_ParamGen *pParam, bool Local)
             
             /* Waiting for local state */
             if(Local)
-            {
+            {                                   
                 for(i_rem = 1; i_rem < 5; i_rem++)
                 {
                     MENU_DisplayValue(pParam, i_rem);
                     lcd_gotoxy(1, i_rem);
                     printf_lcd(" ");
                 }
-                menuState = MENU_STATE_NAVIGATION;
             }
             else
             {
@@ -222,8 +221,7 @@ void MENU_Execute(S_ParamGen *pParam, bool Local)
                     lcd_gotoxy(1, i_rem);
                     printf_lcd("#");
                 }
-            }
-            
+            }  
             break;
         
         default:
@@ -231,14 +229,21 @@ void MENU_Execute(S_ParamGen *pParam, bool Local)
     }
 
     /* Backlight based on inactivity and local state */
-    if(Pec12NoActivity() && Local)
-        lcd_bl_off();
-    else
-        lcd_bl_on();
+//    if(Pec12NoActivity() && Local)
+//        lcd_bl_off();
+//    else
+//        lcd_bl_on();
 
     /* Automatic state change when not on local */
     if(!Local)
+    {
         menuState = MENU_STATE_REMOTE;
+    }
+    else
+    {
+        GENSIG_UpdateSignal(pParam);
+        menuState = MENU_STATE_NAVIGATION;  
+    }
 }
 
 void MENU_DisplayLine(S_ParamGen *pParam, uint8_t lcdLine)

@@ -330,7 +330,9 @@ build/pic32mx_eth_sk2/production/_ext/1434663852/sys_console_usb_cdc.o: \
  ../../../../../framework/driver/ethmac/drv_ethmac.h \
  ../../../../../framework/driver/miim/drv_miim.h ../src/app.h \
  ../src/system_config/pic32mx_eth_sk2/framework/driver/tmr/drv_tmr_static.h \
- ../src/appgen.h ../src/DefMenuGen.h \
+ ../src/appgen.h ../src/DefMenuGen.h ../src/Debounce.h ../src/Generator.h \
+ ../src/Inputs.h \
+ ../src/system_config/pic32mx_eth_sk2/framework/driver/tmr/drv_tmr_static.h \
  ../../../../../framework/system/console/src/sys_console_usb_cdc_local.h \
  ../../../../../framework/system/console/src/sys_console_local.h
 
@@ -999,6 +1001,14 @@ build/pic32mx_eth_sk2/production/_ext/1434663852/sys_console_usb_cdc.o: \
 ../src/appgen.h:
 
 ../src/DefMenuGen.h:
+
+../src/Debounce.h:
+
+../src/Generator.h:
+
+../src/Inputs.h:
+
+../src/system_config/pic32mx_eth_sk2/framework/driver/tmr/drv_tmr_static.h:
 
 ../../../../../framework/system/console/src/sys_console_usb_cdc_local.h:
 

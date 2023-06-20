@@ -330,7 +330,9 @@ build/pic32mx_eth_sk2/production/_ext/1360937237/Debounce.o: \
  ../../../../../framework/driver/ethmac/drv_ethmac.h \
  ../../../../../framework/driver/miim/drv_miim.h ../src/app.h \
  ../src/system_config/pic32mx_eth_sk2/framework/driver/tmr/drv_tmr_static.h \
- ../src/appgen.h ../src/DefMenuGen.h
+ ../src/appgen.h \
+ ../src/system_config/pic32mx_eth_sk2/framework/driver/tmr/drv_tmr_static.h \
+ ../src/DefMenuGen.h ../src/Generator.h ../src/Inputs.h
 
 ../src/Debounce.h:
 
@@ -1000,4 +1002,10 @@ build/pic32mx_eth_sk2/production/_ext/1360937237/Debounce.o: \
 
 ../src/appgen.h:
 
+../src/system_config/pic32mx_eth_sk2/framework/driver/tmr/drv_tmr_static.h:
+
 ../src/DefMenuGen.h:
+
+../src/Generator.h:
+
+../src/Inputs.h:
